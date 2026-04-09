@@ -147,6 +147,10 @@ class WDM_Importer {
         $urls = array_unique( $matches[1] );
 
         foreach ( $urls as $url ) {
+            if ( preg_match( '/(ajax-loader|spinner|loading|placeholder|blank)\.(gif|png|svg|jpg)/i', $url ) ) {
+                continue;
+            }
+            
             if ( strpos( $url, $old_domain ) !== false ) {
                 $clean_url = strtok( $url, '?' );
                 $attachment_id = $this->media_handler->sideload_image( $clean_url, $post_id );
