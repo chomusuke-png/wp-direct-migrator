@@ -14,9 +14,15 @@ class WDM_Importer {
     }
 
     public function process_batch( $url, $page ) {
+        if ( function_exists( 'set_time_limit' ) ) {
+            @set_time_limit( 0 ); 
+        }
+        wp_suspend_cache_addition( true );
+
         $response = $this->api_client->fetch_posts( $url, $page );
         
         if ( isset( $response['error'] ) ) {
+            wp_suspend_cache_addition( false );
             return array( 'success' => false, 'message' => $response['error'] );
         }
 
@@ -24,7 +30,7 @@ class WDM_Importer {
         $total_pages = $response['total_pages'];
         $skipped     = array();
         $imported    = 0;
-        
+
         $parsed_old_url = wp_parse_url( $url );
         $old_domain     = isset( $parsed_old_url['host'] ) ? $parsed_old_url['host'] : '';
 
@@ -81,6 +87,8 @@ class WDM_Importer {
 
             $imported++;
         }
+
+        wp_suspend_cache_addition( false );
 
         return array(
             'success'     => true,

@@ -109,7 +109,12 @@ if ( ! defined( 'ABSPATH' ) ) {
                     }
 
                     if (data.next_page && isMigrating) {
-                        processBatch(url, data.next_page);
+                        appendLog(`Cooling down server for 2 seconds...`, 'wdm-info');
+                        setTimeout(function() {
+                            if (isMigrating) {
+                                processBatch(url, data.next_page);
+                            }
+                        }, 2000);
                     } else if (!data.next_page) {
                         appendLog('Migration completed successfully!', 'wdm-success');
                         isMigrating = false;
