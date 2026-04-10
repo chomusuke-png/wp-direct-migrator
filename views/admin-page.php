@@ -14,6 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
         .wdm-success { color: #27c93f; }
         .wdm-info { color: #ffbd2e; }
         .wdm-actions { margin-top: 15px; display: flex; gap: 10px; }
+        .wdm-separator { margin: 20px 0; border-top: 1px solid #eee; }
     </style>
 
     <div class="wdm-container">
@@ -37,6 +38,14 @@ if ( ! defined( 'ABSPATH' ) ) {
             <button type="button" id="wdm_start_btn" class="button button-primary">Start Migration</button>
             <button type="button" id="wdm_stop_btn" class="button button-secondary" disabled>Stop Migration</button>
         </div>
+        
+        <div class="wdm-separator"></div>
+        
+        <h3>Maintenance</h3>
+        <p class="description">Scan and permanently delete junk images (like lazy-load spinners) that were accidentally imported.</p>
+        <div class="wdm-actions">
+            <button type="button" id="wdm_cleanup_btn" class="button button-secondary">Clean Up Junk Images</button>
+        </div>
     </div>
 
     <div class="wdm-log-container" id="wdm_log_container" style="display:none;">
@@ -47,6 +56,7 @@ if ( ! defined( 'ABSPATH' ) ) {
         document.addEventListener('DOMContentLoaded', function() {
             const startBtn     = document.getElementById('wdm_start_btn');
             const stopBtn      = document.getElementById('wdm_stop_btn');
+            const cleanupBtn   = document.getElementById('wdm_cleanup_btn');
             const urlInput     = document.getElementById('wdm_target_url');
             const pageInput    = document.getElementById('wdm_start_page');
             const logContainer = document.getElementById('wdm_log_container');
@@ -64,10 +74,11 @@ if ( ! defined( 'ABSPATH' ) ) {
             }
 
             function toggleButtons(running) {
-                startBtn.disabled  = running;
-                stopBtn.disabled   = !running;
-                urlInput.readOnly  = running;
-                pageInput.readOnly = running;
+                startBtn.disabled   = running;
+                stopBtn.disabled    = !running;
+                cleanupBtn.disabled = running;
+                urlInput.readOnly   = running;
+                pageInput.readOnly  = running;
             }
 
             function processBatch(url, page) {
@@ -132,6 +143,48 @@ if ( ! defined( 'ABSPATH' ) ) {
                 });
             }
 
+            function runCleanupBatch(totalDeleted) {
+                const formData = new FormData();
+                formData.append('action', 'wdm_cleanup_media');
+                formData.append('nonce', '<?php echo wp_create_nonce("wdm_migration_nonce"); ?>');
+
+                fetch(ajaxurl, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(response => {
+                    if (!response.success) {
+                        appendLog(`Cleanup Error: ${response.data.message}`, 'wdm-error');
+                        cleanupBtn.disabled = false;
+                        startBtn.disabled   = false;
+                        return;
+                    }
+
+                    const data = response.data;
+                    const currentDeleted = data.deletedCount;
+                    
+                    if (data.deletedItems && data.deletedItems.length > 0) {
+                        data.deletedItems.forEach(item => {
+                            appendLog(`Deleted junk image: ${item}`, 'wdm-info');
+                        });
+                    }
+
+                    if (!data.completed) {
+                        runCleanupBatch(totalDeleted + currentDeleted);
+                    } else {
+                        appendLog(`Cleanup finished. Total junk images removed: ${totalDeleted + currentDeleted}`, 'wdm-success');
+                        cleanupBtn.disabled = false;
+                        startBtn.disabled   = false;
+                    }
+                })
+                .catch(error => {
+                    appendLog(`Cleanup request failed: ${error.message}`, 'wdm-error');
+                    cleanupBtn.disabled = false;
+                    startBtn.disabled   = false;
+                });
+            }
+
             startBtn.addEventListener('click', function() {
                 const url = urlInput.value.trim();
                 const startPage = parseInt(pageInput.value, 10);
@@ -161,6 +214,21 @@ if ( ! defined( 'ABSPATH' ) ) {
                     isMigrating = false;
                     stopBtn.disabled = true;
                 }
+            });
+
+            cleanupBtn.addEventListener('click', function() {
+                if (!confirm('Are you sure you want to scan and delete junk images from your Media Library? This action cannot be undone.')) {
+                    return;
+                }
+
+                logContainer.style.display = 'block';
+                logOutput.innerHTML = '';
+                appendLog('Starting media cleanup. Scanning for lazy-load placeholders...', 'wdm-info');
+                
+                cleanupBtn.disabled = true;
+                startBtn.disabled   = true;
+                
+                runCleanupBatch(0);
             });
         });
     </script>

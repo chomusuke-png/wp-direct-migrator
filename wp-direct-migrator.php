@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Direct Migrator
  * Description: Migrates posts and media directly from a remote WordPress host via REST API.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Zumito
  * Text Domain: wp-direct-migrator
  */
